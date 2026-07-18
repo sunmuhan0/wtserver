@@ -14,8 +14,10 @@ func main() {
 
 	api := r.Group("/api/v1")
 	{
-		api.GET("/player/:nickname", handler.GetPlayer)
+		api.GET("/player-ts/:nickname", handler.GetPlayerTS)
+		api.GET("/player-search/:nickname", handler.SearchPlayer)
 		api.GET("/squadron/:name", handler.GetSquadron)
+		api.GET("/globalstats", handler.GetGlobalStats)
 		api.GET("/vehicle/:name", handler.GetVehicle)
 		api.GET("/news", handler.GetNews)
 	}

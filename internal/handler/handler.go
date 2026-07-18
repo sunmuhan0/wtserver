@@ -1,46 +1,62 @@
 package handler
 
 import (
-	"io"
 	"net/http"
-	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/warthunder/assistant/internal/service"
 )
 
-var dataServiceURL = func() string {
-	url := os.Getenv("DATA_SERVICE_URL")
-	if url == "" {
-		url = "http://127.0.0.1:3001"
+func GetPlayerTS(c *gin.Context) {
+	stats, err := service.GetPlayerTS(c.Param("nickname"))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
 	}
-	return url
-}()
-
-func proxy(target string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		resp, err := http.Get(dataServiceURL + target)
-		if err != nil {
-			c.JSON(http.StatusBadGateway, gin.H{"error": "data service unavailable: " + err.Error()})
-			return
-		}
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		c.Data(resp.StatusCode, "application/json; charset=utf-8", body)
-	}
+	c.JSON(http.StatusOK, stats)
 }
 
-func GetPlayer(c *gin.Context) {
-	proxy("/api/v1/player/" + c.Param("nickname"))(c)
-}
-
-func GetSquadron(c *gin.Context) {
-	proxy("/api/v1/squadron/" + c.Param("name"))(c)
+func SearchPlayer(c *gin.Context) {
+	results, err := service.SearchPlayer(c.Param("nickname"))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, results)
 }
 
 func GetVehicle(c *gin.Context) {
-	proxy("/api/v1/vehicle/" + c.Param("name"))(c)
+	vehicle, err := service.GetVehicle(c.Param("name"))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, vehicle)
+}
+
+func GetSquadron(c *gin.Context) {
+	data, err := service.GetSquadron(c.Param("name"))
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, data)
+}
+
+func GetGlobalStats(c *gin.Context) {
+	data, err := service.GetGlobalStats()
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, data)
 }
 
 func GetNews(c *gin.Context) {
-	proxy("/api/v1/news")(c)
+	news, err := service.GetNews()
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, news)
 }

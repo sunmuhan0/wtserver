@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "thunderapi": "^0.7.1"
+  }
+}

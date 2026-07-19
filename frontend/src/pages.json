@@ -1,0 +1,56 @@
+{
+	"pages": [
+		{
+			"path": "pages/splash/splash",
+			"style": {
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/index/index",
+			"style": {
+				"navigationBarTitleText": "战争雷霆查询",
+				"navigationBarBackgroundColor": "#1a1a2e",
+				"navigationBarTextStyle": "white"
+			}
+		},
+		{
+			"path": "pages/player/player",
+			"style": {
+				"navigationBarTitleText": "玩家查询",
+				"navigationBarBackgroundColor": "#1a1a2e",
+				"navigationBarTextStyle": "white"
+			}
+		},
+		{
+			"path": "pages/vehicle/vehicle",
+			"style": {
+				"navigationBarTitleText": "载具百科",
+				"navigationBarBackgroundColor": "#1a1a2e",
+				"navigationBarTextStyle": "white"
+			}
+		},
+		{
+			"path": "pages/squadron/squadron",
+			"style": {
+				"navigationBarTitleText": "联队查询",
+				"navigationBarBackgroundColor": "#1a1a2e",
+				"navigationBarTextStyle": "white"
+			}
+		},
+		{
+			"path": "pages/heatmap/heatmap",
+			"style": {
+				"navigationBarTitleText": "全局热力图",
+				"navigationBarBackgroundColor": "#1a1a2e",
+				"navigationBarTextStyle": "white"
+			}
+		}
+	],
+	"globalStyle": {
+		"navigationBarTextStyle": "white",
+		"navigationBarTitleText": "战争雷霆查询",
+		"navigationBarBackgroundColor": "#1a1a2e",
+		"backgroundColor": "#1a1a2e"
+	}
+}

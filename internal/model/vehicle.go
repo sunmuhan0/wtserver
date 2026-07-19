@@ -3,6 +3,7 @@ package model
 type NewsItem struct {
 	URL   string `json:"url"`
 	Title string `json:"title"`
+	Image string `json:"image"`
 	Date  string `json:"date"`
 }
 

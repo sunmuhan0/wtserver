@@ -53,7 +53,8 @@ func GetGlobalStats(c *gin.Context) {
 }
 
 func GetNews(c *gin.Context) {
-	news, err := service.GetNews()
+	lang := c.DefaultQuery("lang", "zh")
+	news, err := service.GetNews(lang)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return

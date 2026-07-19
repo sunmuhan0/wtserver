@@ -54,7 +54,7 @@ func GetGlobalStats() (*model.GlobalStats, error) {
 }
 
 func fetchWTVehicleStatsDirect() ([]vehicleStatRaw, error) {
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get("https://wtvehiclesapi.duckdns.org/api/vehicles")
 	if err != nil {
 		return nil, fmt.Errorf("vehicles api: %w", err)

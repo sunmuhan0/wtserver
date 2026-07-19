@@ -7,6 +7,18 @@ type NewsItem struct {
 	Date  string `json:"date"`
 }
 
+type ContentBlock struct {
+	Type  string `json:"type"`
+	Level int    `json:"level,omitempty"`
+	Text  string `json:"text,omitempty"`
+	URL   string `json:"url,omitempty"`
+}
+
+type NewsDetail struct {
+	Title   string         `json:"title"`
+	Content []ContentBlock `json:"content"`
+}
+
 type Vehicle struct {
 	Name        string  `json:"name"`
 	Country     string  `json:"country"`

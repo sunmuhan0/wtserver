@@ -251,3 +251,84 @@ func GetNews(lang string) ([]model.NewsItem, error) {
 	}
 	return items, nil
 }
+
+var articleRe = regexp.MustCompile(`(?s)<section class="section section--narrow article">(.*?)</section>`)
+var tagRe = regexp.MustCompile(`<[^>]+>`)
+
+func GetNewsDetail(url string) (*model.NewsDetail, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	html := string(body)
+
+	titleMatch := regexp.MustCompile(`<div class="content__title">\s*([^<]+)`).FindStringSubmatch(html)
+	title := ""
+	if titleMatch != nil {
+		title = strings.TrimSpace(titleMatch[1])
+	}
+
+	articleMatch := articleRe.FindStringSubmatch(html)
+	if articleMatch == nil {
+		return nil, fmt.Errorf("article content not found")
+	}
+	articleHTML := articleMatch[1]
+
+	headingRe2 := regexp.MustCompile(`(?s)<h2[^>]*>(.*?)</h2>`)
+	headingRe3 := regexp.MustCompile(`(?s)<h3[^>]*>(.*?)</h3>`)
+	pRe := regexp.MustCompile(`(?s)<p>(.*?)</p>`)
+	imgRe := regexp.MustCompile(`<img[^>]+src="([^"]+)"`)
+
+	var blocks []model.ContentBlock
+
+	blocksRe := regexp.MustCompile(`(?s)(<h[23][^>]*>.*?</h[23]>|<p>.*?</p>|<img[^>]+>)`)
+	matches := blocksRe.FindAllString(articleHTML, -1)
+
+	for _, m := range matches {
+		if h := headingRe2.FindStringSubmatch(m); h != nil {
+			text := stripTags(h[1])
+			text = strings.TrimSpace(text)
+			if text != "" {
+				blocks = append(blocks, model.ContentBlock{Type: "heading", Level: 2, Text: text})
+			}
+		} else if h := headingRe3.FindStringSubmatch(m); h != nil {
+			text := stripTags(h[1])
+			text = strings.TrimSpace(text)
+			if text != "" {
+				blocks = append(blocks, model.ContentBlock{Type: "heading", Level: 3, Text: text})
+			}
+		} else if p := pRe.FindStringSubmatch(m); p != nil {
+			text := stripTags(p[1])
+			text = strings.TrimSpace(text)
+			if text != "" {
+				blocks = append(blocks, model.ContentBlock{Type: "text", Text: text})
+			}
+		} else if img := imgRe.FindStringSubmatch(m); img != nil {
+			u := img[1]
+			if strings.HasPrefix(u, "//") {
+				u = "https:" + u
+			}
+			blocks = append(blocks, model.ContentBlock{Type: "image", URL: u})
+		}
+	}
+
+	if len(blocks) == 0 {
+		return nil, fmt.Errorf("no content blocks found")
+	}
+
+	return &model.NewsDetail{Title: title, Content: blocks}, nil
+}
+
+func stripTags(s string) string {
+	return strings.TrimSpace(tagRe.ReplaceAllString(s, ""))
+}

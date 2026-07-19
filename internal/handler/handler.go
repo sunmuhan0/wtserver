@@ -61,3 +61,17 @@ func GetNews(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, news)
 }
+
+func GetNewsDetail(c *gin.Context) {
+	url := c.Query("url")
+	if url == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "url is required"})
+		return
+	}
+	detail, err := service.GetNewsDetail(url)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, detail)
+}

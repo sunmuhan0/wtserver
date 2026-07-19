@@ -20,6 +20,7 @@ func main() {
 		api.GET("/globalstats", handler.GetGlobalStats)
 		api.GET("/vehicle/:name", handler.GetVehicle)
 		api.GET("/news", handler.GetNews)
+		api.GET("/news/detail", handler.GetNewsDetail)
 	}
 
 	addr := ":" + cfg.Port

@@ -28,6 +28,11 @@ type ssVehicleInfo struct {
 	IsEvent        bool     `json:"isEvent"`
 	IsGift         bool     `json:"isGift"`
 	IsNormal       bool     `json:"isNormal"`
+	IsHidden       bool     `json:"isHidden"`
+	Crew           int      `json:"crew"`
+	Mass           float64  `json:"mass"`
+	EnginePower    int      `json:"enginePower"`
+	MaxSpeed       float64  `json:"maxSpeed"`
 }
 
 var (
@@ -135,7 +140,74 @@ func ssVehicleToModel(v ssVehicleInfo) *model.Vehicle {
 		Rank:      v.Rank,
 		BR:        fmt.Sprintf("%.1f/%.1f/%.1f", v.BR, brHist, brSim),
 		IsPremium: v.IsPrem,
+		IsHidden:  v.IsHidden,
+		Crew:      v.Crew,
+		Mass:      v.Mass,
+		EnginePower: v.EnginePower,
+		MaxSpeed:  v.MaxSpeed,
 	}
+}
+
+func ListVehicles(country, vtype, search string, limit int) []model.Vehicle {
+	cache, err := loadSSVehicleCache()
+	if err != nil {
+		return nil
+	}
+	lcountry := strings.ToLower(country)
+	lvtype := strings.ToLower(vtype)
+	lsearch := strings.ToLower(search)
+
+	var results []model.Vehicle
+	for _, v := range cache {
+		if lcountry != "" && !strings.Contains(strings.ToLower(v.Country), lcountry) {
+			continue
+		}
+		if lvtype != "" && !strings.Contains(strings.ToLower(v.UnitClass), lvtype) {
+			continue
+		}
+		if lsearch != "" && !strings.Contains(strings.ToLower(v.Name), lsearch) {
+			continue
+		}
+		results = append(results, *ssVehicleToModel(v))
+		if limit > 0 && len(results) >= limit {
+			break
+		}
+	}
+	return results
+}
+
+func GetCountries() []string {
+	cache, err := loadSSVehicleCache()
+	if err != nil {
+		return nil
+	}
+	seen := make(map[string]bool)
+	var countries []string
+	for _, v := range cache {
+		c := strings.TrimPrefix(v.Country, "country_")
+		if c != "" && !seen[c] {
+			seen[c] = true
+			countries = append(countries, c)
+		}
+	}
+	return countries
+}
+
+func GetTypes() []string {
+	cache, err := loadSSVehicleCache()
+	if err != nil {
+		return nil
+	}
+	seen := make(map[string]bool)
+	var types []string
+	for _, v := range cache {
+		t := v.UnitClass
+		if t != "" && !seen[t] {
+			seen[t] = true
+			types = append(types, t)
+		}
+	}
+	return types
 }
 
 func GetSquadron(name string) (*model.Squadron, error) {

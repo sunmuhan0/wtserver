@@ -34,6 +34,21 @@ func GetVehicle(c *gin.Context) {
 	c.JSON(http.StatusOK, vehicle)
 }
 
+func ListVehicles(c *gin.Context) {
+	country := c.DefaultQuery("country", "")
+	vtype := c.DefaultQuery("type", "")
+	search := c.DefaultQuery("search", "")
+	results := service.ListVehicles(country, vtype, search, 50)
+	c.JSON(http.StatusOK, results)
+}
+
+func GetFilters(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"countries": service.GetCountries(),
+		"types":     service.GetTypes(),
+	})
+}
+
 func GetSquadron(c *gin.Context) {
 	data, err := service.GetSquadron(c.Param("name"))
 	if err != nil {

@@ -19,6 +19,8 @@ func main() {
 		api.GET("/squadron/:name", handler.GetSquadron)
 		api.GET("/globalstats", handler.GetGlobalStats)
 		api.GET("/vehicle/:name", handler.GetVehicle)
+		api.GET("/vehicles", handler.ListVehicles)
+		api.GET("/vehicle-filters", handler.GetFilters)
 		api.GET("/news", handler.GetNews)
 		api.GET("/news/detail", handler.GetNewsDetail)
 	}

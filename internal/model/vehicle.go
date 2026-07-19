@@ -26,6 +26,9 @@ type Vehicle struct {
 	Rank        int     `json:"rank"`
 	BR          string  `json:"br"`
 	IsPremium   bool    `json:"is_premium"`
+	IsEvent     bool    `json:"is_event"`
+	IsGift      bool    `json:"is_gift"`
+	IsNormal    bool    `json:"is_normal"`
 	IsHidden    bool    `json:"is_hidden"`
 	Crew        int     `json:"crew"`
 	Mass        float64 `json:"mass"`

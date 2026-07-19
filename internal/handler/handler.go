@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -38,8 +39,12 @@ func ListVehicles(c *gin.Context) {
 	country := c.DefaultQuery("country", "")
 	vtype := c.DefaultQuery("type", "")
 	search := c.DefaultQuery("search", "")
-	results := service.ListVehicles(country, vtype, search, 50)
-	c.JSON(http.StatusOK, results)
+	offset := 0
+	limit := 30
+	fmt.Sscanf(c.DefaultQuery("offset", "0"), "%d", &offset)
+	fmt.Sscanf(c.DefaultQuery("limit", "30"), "%d", &limit)
+	results, total := service.ListVehicles(country, vtype, search, offset, limit)
+	c.JSON(http.StatusOK, gin.H{"items": results, "total": total})
 }
 
 func GetFilters(c *gin.Context) {

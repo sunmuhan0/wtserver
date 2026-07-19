@@ -148,16 +148,16 @@ func ssVehicleToModel(v ssVehicleInfo) *model.Vehicle {
 	}
 }
 
-func ListVehicles(country, vtype, search string, limit int) []model.Vehicle {
+func ListVehicles(country, vtype, search string, offset, limit int) ([]model.Vehicle, int) {
 	cache, err := loadSSVehicleCache()
 	if err != nil {
-		return nil
+		return nil, 0
 	}
 	lcountry := strings.ToLower(country)
 	lvtype := strings.ToLower(vtype)
 	lsearch := strings.ToLower(search)
 
-	var results []model.Vehicle
+	var all []model.Vehicle
 	for _, v := range cache {
 		if lcountry != "" && !strings.Contains(strings.ToLower(v.Country), lcountry) {
 			continue
@@ -168,12 +168,17 @@ func ListVehicles(country, vtype, search string, limit int) []model.Vehicle {
 		if lsearch != "" && !strings.Contains(strings.ToLower(v.Name), lsearch) {
 			continue
 		}
-		results = append(results, *ssVehicleToModel(v))
-		if limit > 0 && len(results) >= limit {
-			break
-		}
+		all = append(all, *ssVehicleToModel(v))
 	}
-	return results
+	total := len(all)
+	if offset >= total {
+		return nil, total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return all[offset:end], total
 }
 
 func GetCountries() []string {

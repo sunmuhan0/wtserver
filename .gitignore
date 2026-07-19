@@ -1,0 +1,11 @@
+node_modules/
+frontend/node_modules/
+backend/bin/
+*.exe
+*.exe~
+.env
+.DS_Store
+.idea/
+*.log
+wtserver
+wtserver.exe

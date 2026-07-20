@@ -82,6 +82,63 @@ func GetNews(c *gin.Context) {
 	c.JSON(http.StatusOK, news)
 }
 
+func GetPlayerSS(c *gin.Context) {
+	data, err := service.GetPlayerSS(c.Param("nickname"), "")
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, data)
+}
+
+func SearchPlayerSS(c *gin.Context) {
+	data, err := service.SearchPlayerSS(c.Param("nickname"), "")
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, data)
+}
+
+func GetLeaderboardHistorySS(c *gin.Context) {
+	data, err := service.GetLeaderboardHistorySS(c.Param("nickname"), "")
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, data)
+}
+
+func GetPlayerSSV3(c *gin.Context) {
+	token := c.GetHeader("X-Turnstile-Token")
+	data, err := service.GetPlayerSSV3(c.Param("nickname"), token)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, data)
+}
+
+func SearchPlayerSSV3(c *gin.Context) {
+	token := c.GetHeader("X-Turnstile-Token")
+	data, err := service.SearchPlayerSSV3(c.Param("nickname"), token)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, data)
+}
+
+func GetLeaderboardHistorySSV3(c *gin.Context) {
+	token := c.GetHeader("X-Turnstile-Token")
+	data, err := service.GetLeaderboardHistorySSV3(c.Param("nickname"), token)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, data)
+}
+
 func GetNewsDetail(c *gin.Context) {
 	url := c.Query("url")
 	if url == "" {

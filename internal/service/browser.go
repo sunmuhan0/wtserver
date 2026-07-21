@@ -65,24 +65,42 @@ func (b *BrowserClient) Fetch(method, url string, headers map[string]string, bod
 	b.mu.RUnlock()
 
 	reqURL := b.proxyURL + url
-	var resp *http.Response
-	var err error
+	var lastStatus int
+	var lastBody string
 
-	if method == "GET" {
-		resp, err = http.Get(reqURL)
-	} else {
-		req, _ := http.NewRequest("POST", reqURL, bytes.NewReader([]byte(body)))
-		req.Header.Set("Content-Type", "application/json")
-		resp, err = http.DefaultTransport.RoundTrip(req)
+	for attempt := 0; attempt < 3; attempt++ {
+		var resp *http.Response
+		var err error
+
+		if method == "GET" {
+			resp, err = http.Get(reqURL)
+		} else {
+			req, _ := http.NewRequest("POST", reqURL, bytes.NewReader([]byte(body)))
+			req.Header.Set("Content-Type", "application/json")
+			resp, err = http.DefaultTransport.RoundTrip(req)
+		}
+
+		if err != nil {
+			return 0, "", fmt.Errorf("proxy request: %w", err)
+		}
+
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		status := resp.StatusCode
+		respStr := string(respBody)
+		lastStatus = status
+		lastBody = respStr
+
+		if status == 503 {
+			log.Printf("[browser] proxy 503 (refresh in progress), retrying in 3s... (attempt %d/3)", attempt+1)
+			time.Sleep(3 * time.Second)
+			continue
+		}
+
+		return status, respStr, nil
 	}
 
-	if err != nil {
-		return 0, "", fmt.Errorf("proxy request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	return resp.StatusCode, string(respBody), nil
+	return lastStatus, lastBody, nil
 }
 
 func (b *BrowserClient) IsTokenValid() bool {

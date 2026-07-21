@@ -384,32 +384,76 @@ func GetPlayerDetailV3(nickname string, token string) (*model.SSPlayerDetail, er
 func parseSSPlayerDetail(data []byte) (*model.SSPlayerDetail, error) {
 	var raw struct {
 		Basics struct {
-			Nickname    string `json:"nickname"`
-			UID         string `json:"uid"`
-			Level       int    `json:"level"`
-			LevelProg   float64 `json:"levelProgress"`
-			Title       string `json:"title"`
-			SquadronName *string `json:"SquadronName"`
-			PFP         string `json:"pfp"`
-			BanStatus   string `json:"banStatus"`
-			LastUpdate  string `json:"lastupdate"`
+			Nickname      string  `json:"nickname"`
+			UID           string  `json:"uid"`
+			Level         int     `json:"level"`
+			LevelProg     float64 `json:"levelProgress"`
+			Title         string  `json:"title"`
+			TitleDisc     string  `json:"titleDisc"`
+			SquadronName  *string `json:"SquadronName"`
+			SquadronID    string  `json:"squadid"`
+			PFP           string  `json:"pfp"`
+			BanStatus     string  `json:"banStatus"`
+			TotalViews    int     `json:"totalviews"`
+			RecentViews   int     `json:"recentviews"`
+			LastUpdate    string  `json:"lastupdate"`
 		} `json:"Basics"`
 		Profile struct {
 			Arcade struct {
-				PvPPlayed map[string]interface{} `json:"pvp_played"`
+				PvPPlayed   map[string]interface{} `json:"pvp_played"`
+				SkirmishPlayed map[string]interface{} `json:"skirmish_played"`
 			} `json:"arcade"`
 			Rb struct {
-				PvPPlayed map[string]interface{} `json:"pvp_played"`
+				PvPPlayed   map[string]interface{} `json:"pvp_played"`
+				SkirmishPlayed map[string]interface{} `json:"skirmish_played"`
 			} `json:"rb"`
 			Sim struct {
-				PvPPlayed map[string]interface{} `json:"pvp_played"`
+				PvPPlayed   map[string]interface{} `json:"pvp_played"`
+				SkirmishPlayed map[string]interface{} `json:"skirmish_played"`
 			} `json:"sim"`
+			Leaderboard json.RawMessage `json:"Leaderboard"`
 		} `json:"Profile"`
 		Misc struct {
-			RegisterDay int64 `json:"registerDay"`
-			LastDayOnline int64 `json:"lastDayOnline"`
+			RegisterDay     int64 `json:"registerDay"`
+			LastDayOnline   int64 `json:"lastDayOnline"`
+			SquadronHistory []struct {
+				ClanID   int    `json:"ClanID"`
+				ClanTag  string `json:"ClanTag"`
+				Date     string `json:"Date"`
+			} `json:"SquadronHistory"`
+			NameHistory []struct {
+				IGN  string `json:"IGN"`
+				Date string `json:"Date"`
+			} `json:"NameHistory"`
+			Titles []struct {
+				Name string `json:"name"`
+				Lang string `json:"lang"`
+				Disc string `json:"disc"`
+			} `json:"titles"`
 		} `json:"Misc"`
-		SpadeInfo map[string]interface{} `json:"SpadeInfo"`
+		SpadeInfo map[string]map[string]interface{} `json:"SpadeInfo"`
+		Ratings struct {
+			Total map[string]*struct {
+				Rating float64 `json:"rating"`
+			} `json:"total"`
+		} `json:"ratings"`
+		RatingsNeo map[string]*struct {
+			Monthly struct {
+				Wt8         float64 `json:"wt8"`
+				OriginalWt8 float64 `json:"original_wt8"`
+				IsSuspicious bool   `json:"isSuspicious"`
+				Contributions struct {
+					Kills    float64 `json:"kills"`
+					Position float64 `json:"position"`
+					Win      float64 `json:"win"`
+					Score    float64 `json:"score"`
+				} `json:"contributions"`
+			} `json:"monthly"`
+		} `json:"ratingsNeo"`
+		UserInfo struct {
+			Likes    int `json:"Likes"`
+			Dislikes int `json:"Dislikes"`
+		} `json:"UserInfo"`
 	}
 
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -424,38 +468,168 @@ func parseSSPlayerDetail(data []byte) (*model.SSPlayerDetail, error) {
 	uid := 0
 	fmt.Sscanf(raw.Basics.UID, "%d", &uid)
 
+	squadID := 0
+	fmt.Sscanf(raw.Basics.SquadronID, "%d", &squadID)
+
 	spadedTotal := 0
-	for _, v := range raw.SpadeInfo {
-		if m, ok := v.(map[string]interface{}); ok {
-			spadedTotal += len(m)
-		}
+	spadedByCountry := make(map[string]int)
+	for country, vehicles := range raw.SpadeInfo {
+		count := len(vehicles)
+		spadedByCountry[country] = count
+		spadedTotal += count
 	}
 
 	detail := &model.SSPlayerDetail{
-		Nickname:    raw.Basics.Nickname,
-		UID:         uid,
-		Level:       raw.Basics.Level,
-		LevelProg:   raw.Basics.LevelProg,
-		Title:       raw.Basics.Title,
-		Squadron:    squadron,
-		Avatar:      raw.Basics.PFP,
-		BanStatus:   raw.Basics.BanStatus,
-		LastUpdate:  raw.Basics.LastUpdate,
-		RegisterDay: raw.Misc.RegisterDay,
-		LastOnline:  raw.Misc.LastDayOnline,
-		SpadedTotal: spadedTotal,
-		Arcade:    parseSSDetailMode(raw.Profile.Arcade.PvPPlayed),
-		Realistic: parseSSDetailMode(raw.Profile.Rb.PvPPlayed),
-		Simulator: parseSSDetailMode(raw.Profile.Sim.PvPPlayed),
+		Nickname:        raw.Basics.Nickname,
+		UID:             uid,
+		Level:           raw.Basics.Level,
+		LevelProg:       raw.Basics.LevelProg,
+		Title:           raw.Basics.Title,
+		TitleDisc:       raw.Basics.TitleDisc,
+		Squadron:        squadron,
+		SquadronID:      squadID,
+		Avatar:          raw.Basics.PFP,
+		BanStatus:       raw.Basics.BanStatus,
+		TotalViews:      raw.Basics.TotalViews,
+		RecentViews:     raw.Basics.RecentViews,
+		LastUpdate:      raw.Basics.LastUpdate,
+		RegisterDay:     raw.Misc.RegisterDay,
+		LastOnline:      raw.Misc.LastDayOnline,
+		SpadedTotal:     spadedTotal,
+		SpadedByCountry: spadedByCountry,
+		Arcade:          parseSSDetailModeFull(raw.Profile.Arcade.PvPPlayed, raw.Profile.Arcade.SkirmishPlayed),
+		Realistic:       parseSSDetailModeFull(raw.Profile.Rb.PvPPlayed, raw.Profile.Rb.SkirmishPlayed),
+		Simulator:       parseSSDetailModeFull(raw.Profile.Sim.PvPPlayed, raw.Profile.Sim.SkirmishPlayed),
 	}
+
+	if raw.Profile.Leaderboard != nil {
+		detail.Leaderboard = parseLeaderboard(raw.Profile.Leaderboard)
+	}
+	if raw.Ratings.Total != nil {
+		detail.Ratings = &model.SSRatings{Total: make(map[string]*model.SSRatingsEntry)}
+		for k, v := range raw.Ratings.Total {
+			detail.Ratings.Total[k] = &model.SSRatingsEntry{Rating: v.Rating}
+		}
+	}
+	if raw.RatingsNeo != nil {
+		detail.RatingsNeo = &model.SSRatingsNeo{}
+		if e, ok := raw.RatingsNeo["tank_realistic"]; ok {
+			detail.RatingsNeo.TankRealistic = &model.SSRatingsNeoEntry{}
+			detail.RatingsNeo.TankRealistic.Monthly.Wt8 = e.Monthly.Wt8
+			detail.RatingsNeo.TankRealistic.Monthly.OriginalWt8 = e.Monthly.OriginalWt8
+			detail.RatingsNeo.TankRealistic.Monthly.IsSuspicious = e.Monthly.IsSuspicious
+			detail.RatingsNeo.TankRealistic.Monthly.Contributions.Kills = e.Monthly.Contributions.Kills
+			detail.RatingsNeo.TankRealistic.Monthly.Contributions.Position = e.Monthly.Contributions.Position
+			detail.RatingsNeo.TankRealistic.Monthly.Contributions.Win = e.Monthly.Contributions.Win
+			detail.RatingsNeo.TankRealistic.Monthly.Contributions.Score = e.Monthly.Contributions.Score
+		}
+		if e, ok := raw.RatingsNeo["tank_arcade"]; ok {
+			detail.RatingsNeo.TankArcade = &model.SSRatingsNeoEntry{}
+			detail.RatingsNeo.TankArcade.Monthly.Wt8 = e.Monthly.Wt8
+			detail.RatingsNeo.TankArcade.Monthly.IsSuspicious = e.Monthly.IsSuspicious
+		}
+		if e, ok := raw.RatingsNeo["air_realistic"]; ok {
+			detail.RatingsNeo.AirRealistic = &model.SSRatingsNeoEntry{}
+			detail.RatingsNeo.AirRealistic.Monthly.Wt8 = e.Monthly.Wt8
+			detail.RatingsNeo.AirRealistic.Monthly.IsSuspicious = e.Monthly.IsSuspicious
+		}
+		if e, ok := raw.RatingsNeo["air_arcade"]; ok {
+			detail.RatingsNeo.AirArcade = &model.SSRatingsNeoEntry{}
+			detail.RatingsNeo.AirArcade.Monthly.Wt8 = e.Monthly.Wt8
+			detail.RatingsNeo.AirArcade.Monthly.IsSuspicious = e.Monthly.IsSuspicious
+		}
+	}
+
+	for _, h := range raw.Misc.NameHistory {
+		detail.NameHistory = append(detail.NameHistory, model.SSNameHistory{IGN: h.IGN, Date: h.Date})
+	}
+	for _, h := range raw.Misc.SquadronHistory {
+		detail.SquadronHistory = append(detail.SquadronHistory, model.SSSquadronHistory{ClanID: h.ClanID, ClanTag: h.ClanTag, Date: h.Date})
+	}
+	for _, t := range raw.Misc.Titles {
+		detail.Titles = append(detail.Titles, model.SSTitle{Name: t.Name, Lang: t.Lang, Disc: t.Disc})
+	}
+
+	detail.UserInfo = &model.SSUserInfo{Likes: raw.UserInfo.Likes, Dislikes: raw.UserInfo.Dislikes}
 
 	return detail, nil
 }
 
+func parseLeaderboard(raw json.RawMessage) *model.SSLeaderboardData {
+	var lbRaw map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &lbRaw); err != nil {
+		return nil
+	}
+
+	lb := &model.SSLeaderboardData{}
+	parseLbCat := func(data json.RawMessage) map[string]*model.SSLeaderboardEntry {
+		if data == nil {
+			return nil
+		}
+		var catRaw map[string]json.RawMessage
+		if err := json.Unmarshal(data, &catRaw); err != nil {
+			return nil
+		}
+		result := make(map[string]*model.SSLeaderboardEntry)
+		for _, subKey := range []string{"value_total", "value_inhistory"} {
+			subRaw, ok := catRaw[subKey]
+			if !ok {
+				continue
+			}
+			var entries map[string]json.RawMessage
+			if err := json.Unmarshal(subRaw, &entries); err != nil {
+				continue
+			}
+			prefix := ""
+			if subKey == "value_inhistory" {
+				prefix = "recent_"
+			}
+			for k, v := range entries {
+				var entry struct {
+					ValueTotal float64 `json:"value_total"`
+					Idx        int     `json:"idx"`
+				}
+				if err := json.Unmarshal(v, &entry); err != nil {
+					continue
+				}
+				if entry.Idx <= 0 {
+					continue
+				}
+				result[prefix+k] = &model.SSLeaderboardEntry{Value: entry.ValueTotal, Rank: entry.Idx}
+			}
+		}
+		return result
+	}
+	lb.AirArcade = parseLbCat(lbRaw["air_arcade"])
+	lb.AirRealistic = parseLbCat(lbRaw["air_realistic"])
+	lb.AirSimulation = parseLbCat(lbRaw["air_simulation"])
+	lb.Arcade = parseLbCat(lbRaw["arcade"])
+	lb.HelicopterArcade = parseLbCat(lbRaw["helicopter_arcade"])
+	lb.Historical = parseLbCat(lbRaw["historical"])
+	lb.Simulation = parseLbCat(lbRaw["simulation"])
+	lb.TankArcade = parseLbCat(lbRaw["tank_arcade"])
+	lb.TankRealistic = parseLbCat(lbRaw["tank_realistic"])
+	lb.TankSimulation = parseLbCat(lbRaw["tank_simulation"])
+	return lb
+}
+
 func parseSSDetailMode(pvp map[string]interface{}) *model.SSDetailMode {
+	return parseSSDetailModeFull(pvp, nil)
+}
+
+func parseSSDetailModeFull(pvp map[string]interface{}, skirmish map[string]interface{}) *model.SSDetailMode {
 	if pvp == nil {
 		return nil
 	}
+	mode := &model.SSDetailMode{}
+	mode.PvP = parseSSDetailPvP(pvp)
+	if skirmish != nil {
+		mode.Skirmish = parseSSDetailSkirmish(skirmish)
+	}
+	return mode
+}
+
+func parseSSDetailPvP(pvp map[string]interface{}) *model.SSDetailPvP {
 	games := toInt(pvp["games"])
 	if games == 0 {
 		return nil
@@ -481,29 +655,49 @@ func parseSSDetailMode(pvp map[string]interface{}) *model.SSDetailMode {
 		wr = float64(wins) / float64(games) * 100
 	}
 
-	return &model.SSDetailMode{
-		PvP: &model.SSDetailPvP{
-			Games:         games,
-			Wins:          wins,
-			WinRate:       wr,
-			AirKills:      airK,
-			GroundKills:   groundK,
-			NavalKills:    navalK,
-			Kills:         kills,
-			AIBotKills:    aiAir + aiGround,
-			Respawns:      respawns,
-			KPB:           kpb,
-			KD:            kd,
-			TimePlayed:    toInt(pvp["timePlayed"]),
-			FighterTime:   toInt(pvp["fighterTimePlayed"]),
-			BomberTime:    toInt(pvp["bomberTimePlayed"]),
-			TankTime:      toInt(pvp["tankTimePlayed"]),
-			HeavyTankTime: toInt(pvp["heavy_tankTimePlayed"]),
-			TDTime:        toInt(pvp["tank_destroyerTimePlayed"]),
-			SPAATime:      toInt(pvp["SPAATimePlayed"]),
-			ShipTime:      toInt(pvp["shipTimePlayed"]),
-			HeliTime:      toInt(pvp["helicopterTimePlayed"]),
-		},
+	return &model.SSDetailPvP{
+		Games:         games,
+		Wins:          wins,
+		WinRate:       wr,
+		AirKills:      airK,
+		GroundKills:   groundK,
+		NavalKills:    navalK,
+		Kills:         kills,
+		AIBotKills:    aiAir + aiGround,
+		Respawns:      respawns,
+		KPB:           kpb,
+		KD:            kd,
+		TimePlayed:    toInt(pvp["timePlayed"]),
+		FighterTime:   toInt(pvp["fighterTimePlayed"]),
+		BomberTime:    toInt(pvp["bomberTimePlayed"]),
+		AssaultTime:   toInt(pvp["assaultTimePlayed"]),
+		TankTime:      toInt(pvp["tankTimePlayed"]),
+		HeavyTankTime: toInt(pvp["heavy_tankTimePlayed"]),
+		TDTime:        toInt(pvp["tank_destroyerTimePlayed"]),
+		SPAATime:      toInt(pvp["SPAATimePlayed"]),
+		ShipTime:      toInt(pvp["shipTimePlayed"]),
+		TorpedoBoatTime: toInt(pvp["torpedo_boatTimePlayed"]),
+		GunBoatTime:     toInt(pvp["gun_boatTimePlayed"]),
+		DestroyerTime:   toInt(pvp["destroyerTimePlayed"]),
+		CruiserTime:     toInt(pvp["cruiserTimePlayed"]),
+		HeliTime:        toInt(pvp["helicopterTimePlayed"]),
+		HumanTime:       toInt(pvp["humanTimePlayed"]),
+	}
+}
+
+func parseSSDetailSkirmish(s map[string]interface{}) *model.SSDetailSkirmish {
+	games := toInt(s["games"])
+	if games == 0 {
+		return nil
+	}
+	return &model.SSDetailSkirmish{
+		Games:       games,
+		Wins:        toInt(s["wins"]),
+		AirKills:    toInt(s["airKillsP"]),
+		GroundKills: toInt(s["groundKillsP"]),
+		NavalKills:  toInt(s["navalKillsP"]),
+		Respawns:    toInt(s["respawns"]),
+		TimePlayed:  toInt(s["timePlayed"]),
 	}
 }
 

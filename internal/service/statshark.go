@@ -432,6 +432,7 @@ func parseSSPlayerDetail(data []byte) (*model.SSPlayerDetail, error) {
 			} `json:"titles"`
 		} `json:"Misc"`
 		SpadeInfo map[string]map[string]interface{} `json:"SpadeInfo"`
+		Vehicles  [][]interface{}                  `json:"Vehicles"`
 		Ratings struct {
 			Total map[string]*struct {
 				Rating float64 `json:"rating"`
@@ -500,6 +501,7 @@ func parseSSPlayerDetail(data []byte) (*model.SSPlayerDetail, error) {
 		Arcade:          parseSSDetailModeFull(raw.Profile.Arcade.PvPPlayed, raw.Profile.Arcade.SkirmishPlayed),
 		Realistic:       parseSSDetailModeFull(raw.Profile.Rb.PvPPlayed, raw.Profile.Rb.SkirmishPlayed),
 		Simulator:       parseSSDetailModeFull(raw.Profile.Sim.PvPPlayed, raw.Profile.Sim.SkirmishPlayed),
+		Vehicles:        parseVehicles(raw.Vehicles, raw.SpadeInfo),
 	}
 
 	if raw.Profile.Leaderboard != nil {
@@ -713,6 +715,70 @@ func toInt(v interface{}) int {
 	default:
 		return 0
 	}
+}
+
+func toFloat(v interface{}) float64 {
+	switch n := v.(type) {
+	case float64:
+		return n
+	case int:
+		return float64(n)
+	case json.Number:
+		f, _ := n.Float64()
+		return f
+	default:
+		return 0
+	}
+}
+
+func toStr(v interface{}) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
+}
+
+func parseVehicles(raw [][]interface{}, spadeInfo map[string]map[string]interface{}) []model.SSVehicle {
+	spadedSet := make(map[string]bool)
+	for _, vehicles := range spadeInfo {
+		for name := range vehicles {
+			spadedSet[name] = true
+		}
+	}
+	modes := []string{"arcade", "realistic"}
+	var vehicles []model.SSVehicle
+	for i, modeVehicles := range raw {
+		mode := ""
+		if i < len(modes) {
+			mode = modes[i]
+		}
+		for _, v := range modeVehicles {
+			arr, ok := v.([]interface{})
+			if !ok || len(arr) < 16 {
+				continue
+			}
+			internalName := toStr(arr[15])
+			veh := model.SSVehicle{
+				Mode:         mode,
+				Country:      toStr(arr[1]),
+				Name:         toStr(arr[2]),
+				Battles:      toInt(arr[4]),
+				WinRate:      toFloat(arr[5]),
+				GroundKills:  toInt(arr[6]),
+				AirKills:     toInt(arr[7]),
+				Deaths:       toInt(arr[8]),
+				TimePlayed:   toInt(arr[11]),
+				RP:           toInt(arr[12]),
+				Spaded:       spadedSet[internalName],
+				Category:     toStr(arr[14]),
+				InternalName: internalName,
+			}
+			if veh.Battles > 0 {
+				vehicles = append(vehicles, veh)
+			}
+		}
+	}
+	return vehicles
 }
 
 func GetLeaderboardHistorySS(nickname string, token string) (*model.SSLeaderboardHistory, error) {

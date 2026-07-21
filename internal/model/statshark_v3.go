@@ -21,16 +21,33 @@ type SSPlayerDetail struct {
 	Realistic *SSDetailMode `json:"realistic"`
 	Simulator *SSDetailMode `json:"simulator"`
 
-	SpadedTotal int                    `json:"spaded_total"`
-	SpadedByCountry map[string]int     `json:"spaded_by_country"`
+	SpadedTotal     int            `json:"spaded_total"`
+	SpadedByCountry map[string]int `json:"spaded_by_country"`
+	Vehicles        []SSVehicle    `json:"vehicles"`
 
-	Leaderboard   *SSLeaderboardData   `json:"leaderboard"`
-	Ratings       *SSRatings           `json:"ratings"`
-	RatingsNeo    *SSRatingsNeo        `json:"ratings_neo"`
-	NameHistory   []SSNameHistory      `json:"name_history"`
-	SquadronHistory []SSSquadronHistory `json:"squadron_history"`
-	Titles        []SSTitle            `json:"titles"`
-	UserInfo      *SSUserInfo          `json:"user_info"`
+	Leaderboard    *SSLeaderboardData   `json:"leaderboard"`
+	Ratings        *SSRatings           `json:"ratings"`
+	RatingsNeo     *SSRatingsNeo        `json:"ratings_neo"`
+	NameHistory    []SSNameHistory      `json:"name_history"`
+	SquadronHistory []SSSquadronHistory  `json:"squadron_history"`
+	Titles         []SSTitle            `json:"titles"`
+	UserInfo       *SSUserInfo          `json:"user_info"`
+}
+
+type SSVehicle struct {
+	Mode         string  `json:"mode"`
+	Country      string  `json:"country"`
+	Name         string  `json:"name"`
+	Battles      int     `json:"battles"`
+	WinRate      float64 `json:"win_rate"`
+	GroundKills  int     `json:"ground_kills"`
+	AirKills     int     `json:"air_kills"`
+	Deaths       int     `json:"deaths"`
+	TimePlayed   int     `json:"time_played"`
+	RP           int     `json:"rp"`
+	Spaded       bool    `json:"spaded"`
+	Category     string  `json:"category"`
+	InternalName string  `json:"internal_name"`
 }
 
 type SSDetailMode struct {

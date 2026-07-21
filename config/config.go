@@ -5,6 +5,7 @@ import "os"
 type Config struct {
 	Port            string
 	TokenServiceURL string
+	CaptchaAPIKey   string
 }
 
 func Load() *Config {
@@ -19,5 +20,6 @@ func Load() *Config {
 	return &Config{
 		Port:            port,
 		TokenServiceURL: tokenURL,
+		CaptchaAPIKey:   os.Getenv("CAPTCHA_API_KEY"),
 	}
 }

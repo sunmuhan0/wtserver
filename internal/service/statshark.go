@@ -1,13 +1,9 @@
 package service
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/warthunder/assistant/internal/model"
 )
@@ -22,54 +18,53 @@ func SearchPlayerSS(nickname string, token string) ([]model.SSPlayerSearchResult
 }
 
 func SearchPlayerSSV3(nickname string, token string) ([]model.SSPlayerSearchResult, error) {
-	if token == "" {
-		return nil, fmt.Errorf("X-Turnstile-Token header is required")
-	}
 	return searchPlayerSSAPI(nickname, token)
 }
 
+func browserFetch(method, path string, body string) (int, string, error) {
+	b := GetBrowser()
+	if b == nil {
+		return 0, "", fmt.Errorf("browser not initialized")
+	}
+	return b.Fetch(method, path, nil, body)
+}
+
 func searchPlayerSSAPI(nickname string, token string) ([]model.SSPlayerSearchResult, error) {
-	u := fmt.Sprintf("%s/api/stat/GetIdByName?Name=%s&IgnoreCase=true&MaxCount=25&Details=false",
-		ssBase, url.QueryEscape(nickname))
-
-	req, err := http.NewRequest("GET", u, nil)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
+	if err := ensureBrowser(); err != nil {
+		return nil, fmt.Errorf("browser unavailable: %w", err)
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-	req.Header.Set("Accept", "application/json, text/plain, */*")
-	req.Header.Set("X-Turnstile-Token", token)
-	req.Header.Set("Referer", ssBase+"/players")
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	path := fmt.Sprintf("/api/stat/GetIdByName?Name=%s&IgnoreCase=true&MaxCount=25&Details=false",
+		url.QueryEscape(nickname))
+
+	status, body, err := browserFetch("GET", path, "")
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("browser fetch: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 406 {
+	if status == 406 {
+		go GetBrowser().Refresh()
 		return nil, fmt.Errorf("statshark api requires valid turnstile token (got 406)")
 	}
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("statshark status %d: %s", resp.StatusCode, string(body))
+	if status != 200 {
+		return nil, fmt.Errorf("statshark status %d: %s", status, body)
 	}
 
-	var raw []struct {
-		ID       int    `json:"id"`
-		Nickname string `json:"nickname"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+	var searchResult map[string]string
+	if err := json.Unmarshal([]byte(body), &searchResult); err != nil {
 		return nil, fmt.Errorf("parse json: %w", err)
 	}
 
 	var results []model.SSPlayerSearchResult
-	for _, r := range raw {
+	for idStr, name := range searchResult {
+		var pid int
+		fmt.Sscanf(idStr, "%d", &pid)
 		results = append(results, model.SSPlayerSearchResult{
-			ID:       r.ID,
-			Nickname: r.Nickname,
+			ID:       pid,
+			Nickname: name,
 		})
+	}
+	if results == nil {
+		results = []model.SSPlayerSearchResult{}
 	}
 	return results, nil
 }
@@ -102,51 +97,61 @@ func GetPlayerSS(nickname string, token string) (*model.SSProfile, error) {
 }
 
 func GetPlayerSSV3(nickname string, token string) (*model.SSProfile, error) {
-	if token == "" {
-		return nil, fmt.Errorf("X-Turnstile-Token header is required")
-	}
 	return getPlayerSSAPI(nickname, token)
 }
 
 func getPlayerSSAPI(nickname string, token string) (*model.SSProfile, error) {
-	u := fmt.Sprintf("%s/api/stat/GetLeaderboardHistoryById/%s", ssBase, url.PathEscape(nickname))
-
-	req, err := http.NewRequest("GET", u, nil)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
+	if err := ensureBrowser(); err != nil {
+		return nil, fmt.Errorf("browser unavailable: %w", err)
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-	req.Header.Set("Accept", "application/json, text/plain, */*")
-	req.Header.Set("X-Turnstile-Token", token)
-	req.Header.Set("Referer", ssBase+"/player/"+url.PathEscape(nickname))
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	b := GetBrowser()
+
+	searchPath := fmt.Sprintf("/api/stat/GetIdByName?Name=%s&IgnoreCase=true&MaxCount=1&Details=false",
+		url.QueryEscape(nickname))
+	status, body, err := b.Fetch("GET", searchPath, nil, "")
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("browser fetch search: %w", err)
 	}
-	defer resp.Body.Close()
+	if status != 200 {
+		return nil, fmt.Errorf("statshark search status %d: %s", status, body)
+	}
+	var searchResult map[string]string
+	if err := json.Unmarshal([]byte(body), &searchResult); err != nil {
+		return nil, fmt.Errorf("parse search: %w", err)
+	}
+	var uid string
+	for id := range searchResult {
+		uid = id
+		break
+	}
+	if uid == "" {
+		return nil, fmt.Errorf("player %q not found", nickname)
+	}
 
-	if resp.StatusCode == 406 {
+	path := fmt.Sprintf("/api/stat/GetLeaderboardHistoryById/%s", uid)
+	status, body, err = b.Fetch("GET", path, nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("browser fetch: %w", err)
+	}
+	if status == 406 {
+		go b.Refresh()
 		return nil, fmt.Errorf("statshark api requires valid turnstile token (got 406)")
 	}
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("statshark status %d: %s", resp.StatusCode, string(body))
+	if status != 200 {
+		return nil, fmt.Errorf("statshark status %d: %s", status, body)
 	}
 
-	var raw struct {
-		Result []json.RawMessage `json:"result"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+	var rawArr []json.RawMessage
+	if err := json.Unmarshal([]byte(body), &rawArr); err != nil {
 		return nil, fmt.Errorf("parse json: %w", err)
 	}
 
-	if len(raw.Result) == 0 {
+	if len(rawArr) == 0 {
 		return nil, fmt.Errorf("player not found")
 	}
 
-	return parseSSProfile(raw.Result[0])
+	return parseSSProfile(rawArr[0])
 }
 
 func parseSSProfile(data json.RawMessage) (*model.SSProfile, error) {
@@ -316,39 +321,29 @@ func addModeStats(total *model.SSModeStats, mode *model.SSModeStats) {
 }
 
 func GetPlayerDetailV3(nickname string, token string) (*model.SSPlayerDetail, error) {
-	if token == "" {
-		return nil, fmt.Errorf("X-Turnstile-Token header is required")
+	if err := ensureBrowser(); err != nil {
+		return nil, fmt.Errorf("browser unavailable: %w", err)
 	}
 
-	searchURL := fmt.Sprintf("%s/api/stat/GetIdByName?Name=%s&IgnoreCase=true&MaxCount=1&Details=false",
-		ssBase, url.QueryEscape(nickname))
+	b := GetBrowser()
 
-	req, err := http.NewRequest("GET", searchURL, nil)
+	searchPath := fmt.Sprintf("/api/stat/GetIdByName?Name=%s&IgnoreCase=true&MaxCount=1&Details=false",
+		url.QueryEscape(nickname))
+
+	status, body, err := b.Fetch("GET", searchPath, nil, "")
 	if err != nil {
-		return nil, fmt.Errorf("create search request: %w", err)
+		return nil, fmt.Errorf("browser fetch search: %w", err)
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-	req.Header.Set("Accept", "application/json, text/plain, */*")
-	req.Header.Set("X-Turnstile-Token", token)
-	req.Header.Set("Referer", ssBase+"/players")
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("search request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 406 {
+	if status == 406 {
+		go b.Refresh()
 		return nil, fmt.Errorf("statshark api requires valid turnstile token (got 406)")
 	}
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("statshark search status %d: %s", resp.StatusCode, string(body))
+	if status != 200 {
+		return nil, fmt.Errorf("statshark search status %d: %s", status, body)
 	}
 
 	var searchResult map[string]string
-	if err := json.NewDecoder(resp.Body).Decode(&searchResult); err != nil {
+	if err := json.Unmarshal([]byte(body), &searchResult); err != nil {
 		return nil, fmt.Errorf("parse search result: %w", err)
 	}
 
@@ -369,34 +364,21 @@ func GetPlayerDetailV3(nickname string, token string) (*model.SSPlayerDetail, er
 		return nil, fmt.Errorf("player %q not found", nickname)
 	}
 
-	detailURL := fmt.Sprintf("%s/api/stat/MakeStatRequestById/%s?update=true", ssBase, uid)
-	req2, err := http.NewRequest("POST", detailURL, bytes.NewReader([]byte("{}")))
-	if err != nil {
-		return nil, fmt.Errorf("create detail request: %w", err)
-	}
-	req2.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-	req2.Header.Set("Accept", "application/json, text/plain, */*")
-	req2.Header.Set("Content-Type", "application/json")
-	req2.Header.Set("X-Turnstile-Token", token)
-	req2.Header.Set("Origin", ssBase)
-	req2.Header.Set("Referer", ssBase+"/player/"+uid)
+	detailPath := fmt.Sprintf("/api/stat/MakeStatRequestById/%s?update=true", uid)
 
-	resp2, err := client.Do(req2)
+	status2, body2, err := b.Fetch("POST", detailPath, nil, "{}")
 	if err != nil {
-		return nil, fmt.Errorf("detail request failed: %w", err)
+		return nil, fmt.Errorf("browser fetch detail: %w", err)
 	}
-	defer resp2.Body.Close()
-
-	if resp2.StatusCode == 406 {
+	if status2 == 406 {
+		go b.Refresh()
 		return nil, fmt.Errorf("statshark api requires valid turnstile token (got 406)")
 	}
-	if resp2.StatusCode != 200 {
-		body, _ := io.ReadAll(resp2.Body)
-		return nil, fmt.Errorf("statshark detail status %d: %s", resp2.StatusCode, string(body))
+	if status2 != 200 {
+		return nil, fmt.Errorf("statshark detail status %d: %s", status2, body2)
 	}
 
-	body, _ := io.ReadAll(resp2.Body)
-	return parseSSPlayerDetail(body)
+	return parseSSPlayerDetail([]byte(body2))
 }
 
 func parseSSPlayerDetail(data []byte) (*model.SSPlayerDetail, error) {
@@ -547,77 +529,87 @@ func GetLeaderboardHistorySS(nickname string, token string) (*model.SSLeaderboar
 }
 
 func GetLeaderboardHistorySSV3(nickname string, token string) (*model.SSLeaderboardHistory, error) {
-	if token == "" {
-		return nil, fmt.Errorf("X-Turnstile-Token header is required")
-	}
 	return getLeaderboardHistorySSAPI(nickname, token)
 }
 
 func getLeaderboardHistorySSAPI(nickname string, token string) (*model.SSLeaderboardHistory, error) {
-	u := fmt.Sprintf("%s/api/stat/GetLeaderboardHistoryById/%s", ssBase, url.PathEscape(nickname))
-
-	req, err := http.NewRequest("GET", u, nil)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
+	if err := ensureBrowser(); err != nil {
+		return nil, fmt.Errorf("browser unavailable: %w", err)
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-	req.Header.Set("Accept", "application/json, text/plain, */*")
-	req.Header.Set("X-Turnstile-Token", token)
-	req.Header.Set("Referer", ssBase+"/player/"+url.PathEscape(nickname))
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
+	b := GetBrowser()
+
+	searchPath := fmt.Sprintf("/api/stat/GetIdByName?Name=%s&IgnoreCase=true&MaxCount=1&Details=false",
+		url.QueryEscape(nickname))
+	status, body, err := b.Fetch("GET", searchPath, nil, "")
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("browser fetch search: %w", err)
 	}
-	defer resp.Body.Close()
+	if status != 200 {
+		return nil, fmt.Errorf("statshark search status %d: %s", status, body)
+	}
+	var searchResult map[string]string
+	if err := json.Unmarshal([]byte(body), &searchResult); err != nil {
+		return nil, fmt.Errorf("parse search: %w", err)
+	}
+	var uid string
+	for id := range searchResult {
+		uid = id
+		break
+	}
+	if uid == "" {
+		return nil, fmt.Errorf("player %q not found", nickname)
+	}
 
-	if resp.StatusCode == 406 {
+	path := fmt.Sprintf("/api/stat/GetLeaderboardHistoryById/%s", uid)
+	status, body, err = b.Fetch("GET", path, nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("browser fetch: %w", err)
+	}
+	if status == 406 {
+		go b.Refresh()
 		return nil, fmt.Errorf("statshark api requires valid turnstile token (got 406)")
 	}
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("statshark status %d: %s", resp.StatusCode, string(body))
+	if status != 200 {
+		return nil, fmt.Errorf("statshark status %d: %s", status, body)
 	}
 
-	var raw struct {
-		Result []json.RawMessage `json:"result"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+	var rawArr []json.RawMessage
+	if err := json.Unmarshal([]byte(body), &rawArr); err != nil {
 		return nil, fmt.Errorf("parse json: %w", err)
 	}
 
-	if len(raw.Result) == 0 {
+	if len(rawArr) == 0 {
 		return nil, fmt.Errorf("player not found")
 	}
 
 	history := &model.SSLeaderboardHistory{}
 
-	if len(raw.Result) >= 1 {
-		var account struct {
-			ID       int    `json:"id"`
-			Nickname string `json:"nickname"`
+	if len(rawArr) >= 1 {
+		var entry struct {
+			Date string `json:"date"`
+			Data struct {
+				Arcade struct {
+					T interface{} `json:"t"`
+				} `json:"arcade"`
+				Historical struct {
+					T interface{} `json:"t"`
+				} `json:"historical"`
+			} `json:"data"`
 		}
-		if err := json.Unmarshal(raw.Result[0], &account); err == nil {
-			history.ID = account.ID
-			history.Nickname = account.Nickname
+		if err := json.Unmarshal(rawArr[0], &entry); err == nil {
+			history.Nickname = nickname
 		}
 	}
 
-	if len(raw.Result) >= 2 {
-		var entries []struct {
-			Date  string `json:"date"`
-			Score int    `json:"score"`
-			Rank  int    `json:"rank"`
-		}
-		if err := json.Unmarshal(raw.Result[1], &entries); err == nil {
-			for _, e := range entries {
-				history.History = append(history.History, model.SSHistoryEntry{
-					Date:  e.Date,
-					Score: e.Score,
-					Rank:  e.Rank,
-				})
-			}
+	var entries []struct {
+		Date  string `json:"date"`
+	}
+	if err := json.Unmarshal([]byte(body), &entries); err == nil {
+		for _, e := range entries {
+			history.History = append(history.History, model.SSHistoryEntry{
+				Date: e.Date,
+			})
 		}
 	}
 

@@ -6,10 +6,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/warthunder/assistant/config"
 	"github.com/warthunder/assistant/internal/handler"
+	"github.com/warthunder/assistant/internal/service"
 )
 
 func main() {
 	cfg := config.Load()
+	service.SetCaptchaKey(cfg.CaptchaAPIKey)
+
+	log.Println("starting browser for statshark API...")
+	if err := service.StartBrowser(); err != nil {
+		log.Printf("WARNING: browser start failed: %v (will retry on first request)", err)
+	}
+	defer service.StopBrowser()
+
 	r := gin.Default()
 
 	h := handler.New(cfg)

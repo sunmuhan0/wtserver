@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -119,8 +120,7 @@ func (h *Handler) GetLeaderboardHistorySS(c *gin.Context) {
 }
 
 func (h *Handler) GetPlayerSSV3(c *gin.Context) {
-	token := c.GetHeader("X-Turnstile-Token")
-	data, err := service.GetPlayerSSV3(c.Param("nickname"), token)
+	data, err := service.GetPlayerSSV3(c.Param("nickname"), "")
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
@@ -129,8 +129,7 @@ func (h *Handler) GetPlayerSSV3(c *gin.Context) {
 }
 
 func (h *Handler) SearchPlayerSSV3(c *gin.Context) {
-	token := c.GetHeader("X-Turnstile-Token")
-	data, err := service.SearchPlayerSSV3(c.Param("nickname"), token)
+	data, err := service.SearchPlayerSSV3(c.Param("nickname"), "")
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
@@ -139,8 +138,7 @@ func (h *Handler) SearchPlayerSSV3(c *gin.Context) {
 }
 
 func (h *Handler) GetLeaderboardHistorySSV3(c *gin.Context) {
-	token := c.GetHeader("X-Turnstile-Token")
-	data, err := service.GetLeaderboardHistorySSV3(c.Param("nickname"), token)
+	data, err := service.GetLeaderboardHistorySSV3(c.Param("nickname"), "")
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
@@ -149,17 +147,14 @@ func (h *Handler) GetLeaderboardHistorySSV3(c *gin.Context) {
 }
 
 func (h *Handler) GetPlayerDetailV3(c *gin.Context) {
-	token := c.GetHeader("X-Turnstile-Token")
-	if token == "" {
-		t, err := service.GetToken()
-		if err != nil {
-			c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("no token available: %v", err)})
+	data, err := service.GetPlayerDetailV3(c.Param("nickname"), "")
+	if err != nil {
+		if err.Error() == "statshark api requires valid turnstile token (got 406)" {
+			log.Printf("[handler] token expired, triggering background refresh...")
+			service.TriggerBackgroundRefresh()
+			c.JSON(http.StatusBadGateway, gin.H{"error": "token expired, refreshing in background. retry after a few seconds"})
 			return
 		}
-		token = t
-	}
-	data, err := service.GetPlayerDetailV3(c.Param("nickname"), token)
-	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
@@ -184,8 +179,11 @@ func (h *Handler) SetToken(c *gin.Context) {
 
 func (h *Handler) GetTokenStatus(c *gin.Context) {
 	token, err := service.GetToken()
+	hasToken := err == nil && token != ""
 	c.JSON(http.StatusOK, gin.H{
-		"has_token": err == nil && token != "",
+		"has_token":       hasToken,
+		"token_expired":   err != nil && err.Error() == "token expired",
+		"has_captcha_key": h.cfg.CaptchaAPIKey != "",
 	})
 }
 

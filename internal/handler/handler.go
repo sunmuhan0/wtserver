@@ -5,10 +5,19 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/warthunder/assistant/config"
 	"github.com/warthunder/assistant/internal/service"
 )
 
-func GetPlayerTS(c *gin.Context) {
+type Handler struct {
+	cfg *config.Config
+}
+
+func New(cfg *config.Config) *Handler {
+	return &Handler{cfg: cfg}
+}
+
+func (h *Handler) GetPlayerTS(c *gin.Context) {
 	stats, err := service.GetPlayerTS(c.Param("nickname"))
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -17,7 +26,7 @@ func GetPlayerTS(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
-func SearchPlayer(c *gin.Context) {
+func (h *Handler) SearchPlayer(c *gin.Context) {
 	results, err := service.SearchPlayer(c.Param("nickname"))
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -26,7 +35,7 @@ func SearchPlayer(c *gin.Context) {
 	c.JSON(http.StatusOK, results)
 }
 
-func GetVehicle(c *gin.Context) {
+func (h *Handler) GetVehicle(c *gin.Context) {
 	vehicle, err := service.GetVehicle(c.Param("name"))
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -35,7 +44,7 @@ func GetVehicle(c *gin.Context) {
 	c.JSON(http.StatusOK, vehicle)
 }
 
-func ListVehicles(c *gin.Context) {
+func (h *Handler) ListVehicles(c *gin.Context) {
 	country := c.DefaultQuery("country", "")
 	vtype := c.DefaultQuery("type", "")
 	search := c.DefaultQuery("search", "")
@@ -47,14 +56,14 @@ func ListVehicles(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": results, "total": total})
 }
 
-func GetFilters(c *gin.Context) {
+func (h *Handler) GetFilters(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"countries": service.GetCountries(),
 		"types":     service.GetTypes(),
 	})
 }
 
-func GetSquadron(c *gin.Context) {
+func (h *Handler) GetSquadron(c *gin.Context) {
 	data, err := service.GetSquadron(c.Param("name"))
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -63,7 +72,7 @@ func GetSquadron(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
-func GetGlobalStats(c *gin.Context) {
+func (h *Handler) GetGlobalStats(c *gin.Context) {
 	data, err := service.GetGlobalStats()
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -72,7 +81,7 @@ func GetGlobalStats(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
-func GetNews(c *gin.Context) {
+func (h *Handler) GetNews(c *gin.Context) {
 	lang := c.DefaultQuery("lang", "zh")
 	news, err := service.GetNews(lang)
 	if err != nil {
@@ -82,7 +91,7 @@ func GetNews(c *gin.Context) {
 	c.JSON(http.StatusOK, news)
 }
 
-func GetPlayerSS(c *gin.Context) {
+func (h *Handler) GetPlayerSS(c *gin.Context) {
 	data, err := service.GetPlayerSS(c.Param("nickname"), "")
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -91,7 +100,7 @@ func GetPlayerSS(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
-func SearchPlayerSS(c *gin.Context) {
+func (h *Handler) SearchPlayerSS(c *gin.Context) {
 	data, err := service.SearchPlayerSS(c.Param("nickname"), "")
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -100,7 +109,7 @@ func SearchPlayerSS(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
-func GetLeaderboardHistorySS(c *gin.Context) {
+func (h *Handler) GetLeaderboardHistorySS(c *gin.Context) {
 	data, err := service.GetLeaderboardHistorySS(c.Param("nickname"), "")
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -109,7 +118,7 @@ func GetLeaderboardHistorySS(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
-func GetPlayerSSV3(c *gin.Context) {
+func (h *Handler) GetPlayerSSV3(c *gin.Context) {
 	token := c.GetHeader("X-Turnstile-Token")
 	data, err := service.GetPlayerSSV3(c.Param("nickname"), token)
 	if err != nil {
@@ -119,7 +128,7 @@ func GetPlayerSSV3(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
-func SearchPlayerSSV3(c *gin.Context) {
+func (h *Handler) SearchPlayerSSV3(c *gin.Context) {
 	token := c.GetHeader("X-Turnstile-Token")
 	data, err := service.SearchPlayerSSV3(c.Param("nickname"), token)
 	if err != nil {
@@ -129,7 +138,7 @@ func SearchPlayerSSV3(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
-func GetLeaderboardHistorySSV3(c *gin.Context) {
+func (h *Handler) GetLeaderboardHistorySSV3(c *gin.Context) {
 	token := c.GetHeader("X-Turnstile-Token")
 	data, err := service.GetLeaderboardHistorySSV3(c.Param("nickname"), token)
 	if err != nil {
@@ -139,7 +148,48 @@ func GetLeaderboardHistorySSV3(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
-func GetNewsDetail(c *gin.Context) {
+func (h *Handler) GetPlayerDetailV3(c *gin.Context) {
+	token := c.GetHeader("X-Turnstile-Token")
+	if token == "" {
+		t, err := service.GetToken()
+		if err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("no token available: %v", err)})
+			return
+		}
+		token = t
+	}
+	data, err := service.GetPlayerDetailV3(c.Param("nickname"), token)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, data)
+}
+
+func (h *Handler) SetToken(c *gin.Context) {
+	var req struct {
+		Token       string `json:"token"`
+		CfClearance string `json:"cf_clearance"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := service.SaveToken(req.Token, req.CfClearance); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *Handler) GetTokenStatus(c *gin.Context) {
+	token, err := service.GetToken()
+	c.JSON(http.StatusOK, gin.H{
+		"has_token": err == nil && token != "",
+	})
+}
+
+func (h *Handler) GetNewsDetail(c *gin.Context) {
 	url := c.Query("url")
 	if url == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "url is required"})

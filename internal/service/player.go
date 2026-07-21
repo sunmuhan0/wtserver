@@ -119,8 +119,6 @@ type tsMode struct {
 	Lifetime *int     `json:"lifetime"`
 	KBair    *float64 `json:"kb_air"`
 	KBground *float64 `json:"kb_ground"`
-	KDair    *float64 `json:"kd_air"`
-	KDground *float64 `json:"kd_ground"`
 }
 
 func ptrOrZero(v *float64) float64 {

@@ -12,27 +12,32 @@ func main() {
 	cfg := config.Load()
 	r := gin.Default()
 
+	h := handler.New(cfg)
+
 	v1 := r.Group("/api/v1")
 	{
-		v1.GET("/player-ts/:nickname", handler.GetPlayerTS)
-		v1.GET("/player-search/:nickname", handler.SearchPlayer)
-		v1.GET("/squadron/:name", handler.GetSquadron)
-		v1.GET("/player-ss/:nickname", handler.GetPlayerSS)
-		v1.GET("/player-search-ss/:nickname", handler.SearchPlayerSS)
-		v1.GET("/player-leaderboard-ss/:nickname", handler.GetLeaderboardHistorySS)
-		v1.GET("/globalstats", handler.GetGlobalStats)
-		v1.GET("/vehicle/:name", handler.GetVehicle)
-		v1.GET("/vehicles", handler.ListVehicles)
-		v1.GET("/vehicle-filters", handler.GetFilters)
-		v1.GET("/news", handler.GetNews)
-		v1.GET("/news/detail", handler.GetNewsDetail)
+		v1.GET("/player-ts/:nickname", h.GetPlayerTS)
+		v1.GET("/player-search/:nickname", h.SearchPlayer)
+		v1.GET("/squadron/:name", h.GetSquadron)
+		v1.GET("/player-ss/:nickname", h.GetPlayerSS)
+		v1.GET("/player-search-ss/:nickname", h.SearchPlayerSS)
+		v1.GET("/player-leaderboard-ss/:nickname", h.GetLeaderboardHistorySS)
+		v1.GET("/globalstats", h.GetGlobalStats)
+		v1.GET("/vehicle/:name", h.GetVehicle)
+		v1.GET("/vehicles", h.ListVehicles)
+		v1.GET("/vehicle-filters", h.GetFilters)
+		v1.GET("/news", h.GetNews)
+		v1.GET("/news/detail", h.GetNewsDetail)
+		v1.POST("/token", h.SetToken)
+		v1.GET("/token/status", h.GetTokenStatus)
 	}
 
 	v3 := r.Group("/api/v3")
 	{
-		v3.GET("/player-ss/:nickname", handler.GetPlayerSSV3)
-		v3.GET("/player-search-ss/:nickname", handler.SearchPlayerSSV3)
-		v3.GET("/player-leaderboard-ss/:nickname", handler.GetLeaderboardHistorySSV3)
+		v3.GET("/player-ss/:nickname", h.GetPlayerSSV3)
+		v3.GET("/player-detail/:nickname", h.GetPlayerDetailV3)
+		v3.GET("/player-search-ss/:nickname", h.SearchPlayerSSV3)
+		v3.GET("/player-leaderboard-ss/:nickname", h.GetLeaderboardHistorySSV3)
 	}
 
 	addr := ":" + cfg.Port

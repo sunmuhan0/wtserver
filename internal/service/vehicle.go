@@ -110,7 +110,6 @@ func GetVehicle(name string) (*model.Vehicle, error) {
 		}
 	}
 	if bestSuffix >= 0 {
-		_ = bestID
 		return ssVehicleToModel(bestV), nil
 	}
 
